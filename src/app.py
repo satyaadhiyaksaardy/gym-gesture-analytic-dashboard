@@ -170,7 +170,8 @@ def main():
             st.session_state.ml_results,
             data_loader,
             stats_analyzer,
-            report_generator
+            report_generator,
+            timing_analyzer
         )
     
     # Tab 8: Anomaly Investigation
@@ -180,7 +181,8 @@ def main():
             st.session_state.ml_results,
             timing_analyzer,
             cluster_analyzer,
-            plot_generator
+            plot_generator,
+            ml_visualizer
         )
 
 if __name__ == "__main__":

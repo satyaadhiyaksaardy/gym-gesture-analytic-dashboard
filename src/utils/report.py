@@ -6,7 +6,7 @@ from datetime import datetime
 import pandas as pd
 import numpy as np
 from typing import Dict, Optional
-from config import REPORT_TIMESTAMP_FORMAT, REPORT_FILENAME_FORMAT
+from config import REPORT_TIMESTAMP_FORMAT, REPORT_FILENAME_FORMAT, IRREGULAR_SAMPLING_THRESHOLD_MS
 
 
 class ReportGenerator:
@@ -14,9 +14,10 @@ class ReportGenerator:
     
     def __init__(self):
         self.timestamp = datetime.now()
+        self.irregular_threshold = IRREGULAR_SAMPLING_THRESHOLD_MS
     
     def generate_report(self, df: pd.DataFrame, outlier_mask: Optional[pd.Series],
-                       ml_results: Dict, data_loader, stats_analyzer) -> str:
+                       ml_results: Dict, data_loader, stats_analyzer, timing_analyzer) -> str:
         """Generate comprehensive analysis report"""
         
         report = []
@@ -139,14 +140,15 @@ class ReportGenerator:
                 report.append(f"- Mean Sampling Interval: {intervals.mean():.2f} ms")
                 report.append(f"- Std Sampling Interval: {intervals.std():.2f} ms")
                 
-                irregular_count = (intervals.std() > 15).sum()
-                irregular_pct = irregular_count / len(intervals) * 100
+                sampling_df = timing_analyzer.analyze_sampling_consistency(df)
+                irregular_count = (sampling_df['std_interval_ms'] > self.irregular_threshold).sum()
+                irregular_pct = irregular_count / len(sampling_df) * 100
                 report.append(f"- Groups with Irregular Sampling: {irregular_count} ({irregular_pct:.1f}%)")
         
         # Summary and Recommendations
         report.append("\n## Summary and Recommendations")
         
-        recommendations = self._generate_recommendations(df, data_info, outlier_mask, ml_results)
+        recommendations = self._generate_recommendations(df, data_info, outlier_mask, ml_results, timing_analyzer)
         for rec in recommendations:
             report.append(f"- {rec}")
         
@@ -194,7 +196,7 @@ class ReportGenerator:
     
     def _generate_recommendations(self, df: pd.DataFrame, data_info: Dict,
                                  outlier_mask: Optional[pd.Series], 
-                                 ml_results: Dict) -> list:
+                                 ml_results: Dict, timing_analyzer) -> list:
         """Generate actionable recommendations based on analysis"""
         recommendations = []
         
@@ -211,7 +213,11 @@ class ReportGenerator:
                 lambda x: x.diff().std() if len(x) > 1 else None
             ).dropna()
             
-            if len(intervals) > 0 and intervals.mean() > 15:
+            sampling_df = timing_analyzer.analyze_sampling_consistency(df)
+            irregular_count = (sampling_df['std_interval_ms'] > self.irregular_threshold).sum()
+            irregular_pct = irregular_count / len(sampling_df) * 100
+            
+            if irregular_count > 0 and irregular_pct > 15:
                 recommendations.append("Irregular sampling detected - check sensor connectivity and data transmission")
         
         # ML recommendations

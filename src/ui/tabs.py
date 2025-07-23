@@ -74,6 +74,22 @@ def create_outlier_tab(df: pd.DataFrame, data_cleaner, plot_generator) -> pd.Ser
         fig = plot_generator.plot_outliers_by_sensor(outlier_stats['outliers_by_sensor'])
         st.pyplot(fig)
         safe_plot_close(fig)
+
+    cleaned_df = data_cleaner.clean_data(df, outlier_mask)
+    if 'duration_ms' in df.columns and 'duration_ms' in cleaned_df.columns:
+        fig = plot_generator.plot_distribution_comparison(df['duration_ms'], cleaned_df['duration_ms'],
+                                                         label1="Raw", label2="Cleaned",
+                                                         title="Duration Distribution: Raw vs. Cleaned")
+        st.pyplot(fig)
+        safe_plot_close(fig)
+
+        # Histogram for raw and cleaned durations
+        fig_raw = plot_generator.plot_duration_histogram(df['duration_ms'])
+        st.pyplot(fig_raw)
+        safe_plot_close(fig_raw)
+        fig_clean = plot_generator.plot_duration_histogram(cleaned_df['duration_ms'])
+        st.pyplot(fig_clean)
+        safe_plot_close(fig_clean)
     
     # Data view options
     view_option = st.radio("Data View", ["Raw Data", "Cleaned Data (Outliers Removed)"])
@@ -147,6 +163,22 @@ def create_timing_tab(df: pd.DataFrame, timing_analyzer, plot_generator):
         if not irregular_groups.empty:
             st.warning(f"Found {len(irregular_groups)} groups with irregular sampling")
             st.dataframe(irregular_groups.head(10), use_container_width=True)
+
+    # Sampling intervals plot
+    if not sampling_df.empty and 'mean_interval_ms' in sampling_df.columns:
+        fig = plot_generator.plot_sampling_intervals(sampling_df['mean_interval_ms'])
+        st.pyplot(fig)
+        safe_plot_close(fig)
+
+    # Correlation matrix for timing metrics
+    numeric_cols = [c for c in sampling_df.columns if sampling_df[c].dtype in [float, int]]
+    # Drop sample_count column if it exists
+    if 'sample_count' in numeric_cols:
+        numeric_cols.remove('sample_count')
+    if len(numeric_cols) > 1:
+        fig = plot_generator.plot_correlation_matrix(sampling_df[numeric_cols])
+        st.pyplot(fig)
+        safe_plot_close(fig)
     
     # Repetition durations
     st.subheader("Repetition Duration Analysis")
@@ -313,6 +345,39 @@ def create_ml_tab(features_df: Optional[pd.DataFrame], cluster_analyzer, ml_visu
             
             # Visualizations would go here
             st.info("PCA visualizations would be displayed here")
+
+        # Silhouette analysis plot
+        if results.get('silhouette_scores'):
+            fig = ml_visualizer.plot_silhouette_analysis(results['silhouette_scores'])
+            st.pyplot(fig)
+            safe_plot_close(fig)
+
+        # Cluster distribution
+        if results.get('kmeans_labels') is not None and results.get('dbscan_labels') is not None:
+            fig = ml_visualizer.plot_cluster_distribution(results['kmeans_labels'], results['dbscan_labels'])
+            st.pyplot(fig)
+            safe_plot_close(fig)
+
+        # Cluster heatmap
+        if results.get('kmeans_stats') is not None:
+            fig = ml_visualizer.plot_cluster_heatmap(results['kmeans_stats'])
+            st.pyplot(fig)
+            safe_plot_close(fig)
+
+        # PCA explained variance
+        if results.get('pca') is not None and results.get('X_pca') is not None:
+            exp_var = results['pca'].explained_variance_ratio_
+            fig = ml_visualizer.plot_explained_variance(exp_var)
+            st.pyplot(fig)
+            safe_plot_close(fig)
+            # Optionally add 2D/3D PCA plots
+            fig2d = ml_visualizer.plot_pca_2d(results['X_pca'], results['kmeans_labels'], exp_var)
+            st.pyplot(fig2d)
+            safe_plot_close(fig2d)
+            if results['X_pca'].shape[1] >= 3:
+                fig3d = ml_visualizer.plot_pca_3d(results['X_pca'], results['kmeans_labels'], exp_var)
+                st.pyplot(fig3d)
+                safe_plot_close(fig3d)
         
         return results
     
@@ -386,13 +451,13 @@ def create_signals_tab(df: pd.DataFrame, signal_visualizer):
 
 
 def create_report_tab(df: pd.DataFrame, outlier_mask: Optional[pd.Series], 
-                     ml_results: Dict, data_loader, stats_analyzer, report_generator):
+                     ml_results: Dict, data_loader, stats_analyzer, report_generator, timing_analyzer):
     """Create the summary report tab"""
     st.header("📋 Summary Report")
     
     # Generate report content
     report_content = report_generator.generate_report(
-        df, outlier_mask, ml_results, data_loader, stats_analyzer
+        df, outlier_mask, ml_results, data_loader, stats_analyzer, timing_analyzer
     )
     
     # Display report preview
@@ -408,7 +473,7 @@ def create_report_tab(df: pd.DataFrame, outlier_mask: Optional[pd.Series],
 
 
 def create_anomaly_tab(df: pd.DataFrame, ml_results: Dict, 
-                      timing_analyzer, cluster_analyzer, plot_generator):
+                      timing_analyzer, cluster_analyzer, plot_generator, ml_visualizer):
     """Create the anomaly investigation tab"""
     st.header("🔍 Anomaly Investigation")
     st.markdown("Automated investigation of DBSCAN noise points and irregular sampling patterns")
@@ -434,6 +499,16 @@ def create_anomaly_tab(df: pd.DataFrame, ml_results: Dict,
                     orient='index'
                 )
                 st.dataframe(noise_df, use_container_width=True)
+
+                # Exercise distribution plot for noise
+                if 'sum' in noise_df.columns:
+                    fig = plot_generator.plot_exercise_distribution(noise_df['sum'])
+                    st.pyplot(fig)
+                    safe_plot_close(fig)
+
+            fig = ml_visualizer.plot_dbscan_noise_analysis(ml_results['features_df'], ml_results['dbscan_labels'])
+            st.pyplot(fig)
+            safe_plot_close(fig)
         else:
             st.success("No noise points detected in DBSCAN clustering")
     else:
@@ -452,6 +527,10 @@ def create_anomaly_tab(df: pd.DataFrame, ml_results: Dict,
             if not irregular_groups.empty:
                 st.warning(f"Found {len(irregular_groups)} groups with irregular sampling")
                 st.dataframe(irregular_groups.head(10), use_container_width=True)
+
+                fig = plot_generator.plot_sampling_intervals(irregular_groups['mean_interval_ms'])
+                st.pyplot(fig)
+                safe_plot_close(fig)
             else:
                 st.success("No irregular sampling patterns detected")
     else:
