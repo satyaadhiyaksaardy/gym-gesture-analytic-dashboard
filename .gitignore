@@ -98,7 +98,6 @@ dmypy.json
 Thumbs.db
 
 # Data files
-data/
 *.csv
 *.xlsx
 *.xls
