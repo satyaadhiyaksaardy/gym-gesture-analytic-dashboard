@@ -236,14 +236,14 @@ def create_advanced_visualization_tab(df: pd.DataFrame, eda_visualizer, stats_te
 
 
 def create_statistical_testing_tab(df: pd.DataFrame, stats_tester):
-    """Create statistical testing tab"""
+    """Create statistical testing tab with all test options implemented"""
     st.header("📈 Statistical Testing & Analysis")
     
     # Test selector
     test_type = st.selectbox(
         "Select Statistical Test",
         ["Stationarity Tests", "Normality Tests", "Exercise Comparison", 
-         "Sensor Independence"]
+         "Sensor Independence", "Variance Homogeneity"]
     )
     
     if test_type == "Stationarity Tests":
@@ -257,31 +257,46 @@ def create_statistical_testing_tab(df: pd.DataFrame, stats_tester):
             with st.spinner("Running tests..."):
                 results = stats_tester.test_stationarity(df[sensor])
             
-            if 'error' not in results:
+            if 'error' in results:
+                st.error(f"Error: {results['error']}")
+            else:
                 col1, col2 = st.columns(2)
                 
                 with col1:
-                    if 'adf' in results:
+                    if 'adf' in results and 'error' not in results['adf']:
                         st.write("**Augmented Dickey-Fuller Test**")
                         st.write(f"Statistic: {results['adf']['statistic']:.4f}")
                         st.write(f"p-value: {results['adf']['p_value']:.4f}")
                         st.write(f"Result: {results['adf']['interpretation']}")
+                        
+                        # Show critical values
+                        with st.expander("Critical Values"):
+                            for key, value in results['adf']['critical_values'].items():
+                                st.write(f"{key}: {value:.4f}")
                 
                 with col2:
-                    if 'kpss' in results:
+                    if 'kpss' in results and 'error' not in results['kpss']:
                         st.write("**KPSS Test**")
                         st.write(f"Statistic: {results['kpss']['statistic']:.4f}")
                         st.write(f"p-value: {results['kpss']['p_value']:.4f}")
                         st.write(f"Result: {results['kpss']['interpretation']}")
+                        
+                        # Show critical values
+                        with st.expander("Critical Values"):
+                            for key, value in results['kpss']['critical_values'].items():
+                                st.write(f"{key}: {value:.4f}")
                 
                 # Interpretation
                 if 'adf' in results and 'kpss' in results:
-                    if results['adf']['is_stationary'] and results['kpss']['is_stationary']:
-                        st.success("✅ Both tests indicate the signal is stationary")
-                    elif not results['adf']['is_stationary'] and not results['kpss']['is_stationary']:
-                        st.error("❌ Both tests indicate the signal is non-stationary")
-                    else:
-                        st.warning("⚠️ Tests show conflicting results - further investigation needed")
+                    if 'error' not in results['adf'] and 'error' not in results['kpss']:
+                        st.markdown("---")
+                        if results['adf']['is_stationary'] and results['kpss']['is_stationary']:
+                            st.success("✅ Both tests indicate the signal is stationary")
+                        elif not results['adf']['is_stationary'] and not results['kpss']['is_stationary']:
+                            st.error("❌ Both tests indicate the signal is non-stationary")
+                        else:
+                            st.warning("⚠️ Tests show conflicting results - further investigation needed")
+                            st.info("💡 Conflicting results may indicate trend-stationarity or other complex behavior")
     
     elif test_type == "Normality Tests":
         st.subheader("Distribution Normality Testing")
@@ -294,27 +309,56 @@ def create_statistical_testing_tab(df: pd.DataFrame, stats_tester):
             with st.spinner("Testing normality..."):
                 results = stats_tester.test_normality(df[sensor])
             
-            if 'error' not in results:
-                # Display results
+            if 'error' in results:
+                st.error(f"Error: {results['error']}")
+            else:
+                # Count normal results
                 normal_count = sum(1 for test in results.values() 
                                  if isinstance(test, dict) and test.get('is_normal', False))
                 total_tests = sum(1 for test in results.values() 
                                 if isinstance(test, dict) and 'is_normal' in test)
                 
-                st.info(f"📊 {normal_count}/{total_tests} tests indicate normal distribution")
+                # Summary
+                if total_tests > 0:
+                    st.info(f"📊 {normal_count}/{total_tests} tests indicate normal distribution")
                 
-                # Detailed results
-                with st.expander("View Detailed Test Results"):
-                    for test_name, test_results in results.items():
-                        if isinstance(test_results, dict):
-                            st.write(f"**{test_name.replace('_', ' ').title()}**")
-                            st.json(test_results)
+                # Detailed results in columns
+                col1, col2 = st.columns(2)
                 
-                # Q-Q correlation
-                if 'qq_correlation' in results:
-                    qq_corr = results['qq_correlation']
-                    interpretation = "Strong" if qq_corr > 0.98 else "Moderate" if qq_corr > 0.95 else "Weak"
-                    st.write(f"**Q-Q Plot Correlation**: {qq_corr:.4f} ({interpretation} normality)")
+                with col1:
+                    if 'shapiro_wilk' in results and 'error' not in results['shapiro_wilk']:
+                        st.write("**Shapiro-Wilk Test**")
+                        st.write(f"Statistic: {results['shapiro_wilk']['statistic']:.4f}")
+                        st.write(f"p-value: {results['shapiro_wilk']['p_value']:.4f}")
+                        st.write(f"Normal: {'Yes' if results['shapiro_wilk']['is_normal'] else 'No'}")
+                    
+                    if 'anderson_darling' in results and 'error' not in results['anderson_darling']:
+                        st.write("**Anderson-Darling Test**")
+                        st.write(f"Statistic: {results['anderson_darling']['statistic']:.4f}")
+                        st.write(f"Normal (5%): {'Yes' if results['anderson_darling']['is_normal_5pct'] else 'No'}")
+                
+                with col2:
+                    if 'dagostino_pearson' in results and 'error' not in results['dagostino_pearson']:
+                        st.write("**D'Agostino-Pearson Test**")
+                        st.write(f"Statistic: {results['dagostino_pearson']['statistic']:.4f}")
+                        st.write(f"p-value: {results['dagostino_pearson']['p_value']:.4f}")
+                        st.write(f"Normal: {'Yes' if results['dagostino_pearson']['is_normal'] else 'No'}")
+                    
+                    if 'qq_correlation' in results:
+                        qq_corr = results['qq_correlation']
+                        interpretation = "Strong" if qq_corr > 0.98 else "Moderate" if qq_corr > 0.95 else "Weak"
+                        st.write("**Q-Q Plot Correlation**")
+                        st.write(f"Correlation: {qq_corr:.4f}")
+                        st.write(f"Interpretation: {interpretation} normality")
+                
+                # Visual interpretation
+                st.markdown("---")
+                if normal_count == total_tests and total_tests > 0:
+                    st.success("✅ All tests indicate normal distribution")
+                elif normal_count == 0 and total_tests > 0:
+                    st.error("❌ All tests indicate non-normal distribution")
+                else:
+                    st.warning("⚠️ Mixed results - distribution may be approximately normal")
     
     elif test_type == "Exercise Comparison":
         st.subheader("Statistical Comparison Across Exercises")
@@ -327,30 +371,156 @@ def create_statistical_testing_tab(df: pd.DataFrame, stats_tester):
             with st.spinner("Running statistical comparisons..."):
                 results = stats_tester.compare_exercise_patterns(df, sensor)
             
-            if 'error' not in results:
+            if 'error' in results:
+                st.error(f"Error: {results['error']}")
+            else:
                 # ANOVA results
                 col1, col2 = st.columns(2)
                 
                 with col1:
-                    st.write("**One-way ANOVA**")
-                    st.write(f"F-statistic: {results['anova']['f_statistic']:.4f}")
-                    st.write(f"p-value: {results['anova']['p_value']:.4f}")
-                    if results['anova']['significant']:
-                        st.success("✅ Significant differences found")
-                    else:
-                        st.info("No significant differences")
+                    if 'anova' in results and 'error' not in results['anova']:
+                        st.write("**One-way ANOVA**")
+                        st.write(f"F-statistic: {results['anova']['f_statistic']:.4f}")
+                        st.write(f"p-value: {results['anova']['p_value']:.4f}")
+                        if results['anova']['significant']:
+                            st.success("✅ Significant differences found")
+                        else:
+                            st.info("No significant differences")
                 
                 with col2:
-                    st.write("**Kruskal-Wallis Test**")
-                    st.write(f"H-statistic: {results['kruskal_wallis']['h_statistic']:.4f}")
-                    st.write(f"p-value: {results['kruskal_wallis']['p_value']:.4f}")
-                    if results['kruskal_wallis']['significant']:
-                        st.success("✅ Significant differences found")
-                    else:
-                        st.info("No significant differences")
+                    if 'kruskal_wallis' in results and 'error' not in results['kruskal_wallis']:
+                        st.write("**Kruskal-Wallis Test**")
+                        st.write(f"H-statistic: {results['kruskal_wallis']['h_statistic']:.4f}")
+                        st.write(f"p-value: {results['kruskal_wallis']['p_value']:.4f}")
+                        if results['kruskal_wallis']['significant']:
+                            st.success("✅ Significant differences found")
+                        else:
+                            st.info("No significant differences")
                 
                 # Post-hoc analysis
-                if 'tukey_hsd' in results and results['tukey_hsd']['significant_pairs']:
-                    st.write("**Significant Pairwise Differences (Tukey HSD)**")
-                    pairs_df = pd.DataFrame(results['tukey_hsd']['significant_pairs'])
-                    st.dataframe(pairs_df)
+                if 'tukey_hsd' in results and 'error' not in results['tukey_hsd']:
+                    if results['tukey_hsd']['significant_pairs']:
+                        st.write("**Significant Pairwise Differences (Tukey HSD)**")
+                        pairs_df = pd.DataFrame(results['tukey_hsd']['significant_pairs'])
+                        st.dataframe(pairs_df)
+                    else:
+                        st.info("No significant pairwise differences found")
+    
+    elif test_type == "Sensor Independence":
+        st.subheader("Sensor Channel Independence Testing")
+        
+        st.info("Testing independence between all sensor pairs")
+        
+        if st.button("Run Independence Tests"):
+            with st.spinner("Analyzing sensor relationships..."):
+                results = stats_tester.test_sensor_independence(df)
+            
+            if results:
+                # Convert to DataFrame for better display
+                independence_data = []
+                for pair, metrics in results.items():
+                    if 'error' not in metrics:
+                        row = {
+                            'Sensor Pair': pair.replace('_vs_', ' vs '),
+                            'Pearson r': f"{metrics['pearson_correlation']:.3f}",
+                            'Pearson p': f"{metrics['pearson_p_value']:.3f}",
+                            'Spearman ρ': f"{metrics['spearman_correlation']:.3f}",
+                            'Spearman p': f"{metrics['spearman_p_value']:.3f}",
+                            'MI': f"{metrics['mutual_information']:.3f}",
+                            'Linear Dep': '✓' if metrics['linear_dependent'] else '✗',
+                            'Strength': metrics['strength']
+                        }
+                        independence_data.append(row)
+                
+                if independence_data:
+                    results_df = pd.DataFrame(independence_data)
+                    
+                    # Summary statistics
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        linear_dep_count = sum(1 for d in independence_data if d['Linear Dep'] == '✓')
+                        st.metric("Linear Dependencies", f"{linear_dep_count}/{len(independence_data)}")
+                    with col2:
+                        strong_count = sum(1 for d in independence_data if d['Strength'] == 'Strong')
+                        st.metric("Strong Correlations", strong_count)
+                    with col3:
+                        avg_mi = np.mean([float(d['MI']) for d in independence_data])
+                        st.metric("Avg Mutual Info", f"{avg_mi:.3f}")
+                    
+                    # Detailed results table
+                    st.write("**Detailed Independence Test Results**")
+                    st.dataframe(results_df, use_container_width=True)
+                    
+                    # Interpretation
+                    st.markdown("---")
+                    st.write("**Interpretation Guide:**")
+                    st.write("- **Pearson r**: Linear correlation (-1 to 1)")
+                    st.write("- **Spearman ρ**: Monotonic relationship (-1 to 1)")
+                    st.write("- **MI**: Mutual Information (≥0, higher = more dependence)")
+                    st.write("- **p-values < 0.05**: Statistically significant relationship")
+            else:
+                st.warning("No sensor pairs found for testing")
+    
+    elif test_type == "Variance Homogeneity":
+        st.subheader("Variance Homogeneity Testing")
+        
+        sensor = st.selectbox("Select sensor for variance analysis",
+                            [col for col in df.columns if col in 
+                             ['ax', 'ay', 'az', 'gx', 'gy', 'gz', 'acc_mag', 'gyro_mag']])
+        
+        group_by = st.selectbox("Group by", 
+                               [col for col in ['exercise_type', 'athlete_id'] if col in df.columns])
+        
+        if st.button("Test Variance Homogeneity"):
+            with st.spinner("Testing variance homogeneity..."):
+                results = stats_tester.test_variance_homogeneity(df, sensor, group_by)
+            
+            if 'error' in results:
+                st.error(f"Error: {results['error']}")
+            else:
+                # Test results
+                col1, col2 = st.columns(2)
+                
+                with col1:
+                    if 'levene' in results:
+                        st.write("**Levene's Test**")
+                        st.write("(Robust to non-normality)")
+                        st.write(f"Statistic: {results['levene']['statistic']:.4f}")
+                        st.write(f"p-value: {results['levene']['p_value']:.4f}")
+                        if results['levene']['equal_variances']:
+                            st.success("✅ Equal variances")
+                        else:
+                            st.error("❌ Unequal variances")
+                
+                with col2:
+                    if 'bartlett' in results:
+                        st.write("**Bartlett's Test**")
+                        st.write("(Assumes normality)")
+                        st.write(f"Statistic: {results['bartlett']['statistic']:.4f}")
+                        st.write(f"p-value: {results['bartlett']['p_value']:.4f}")
+                        if results['bartlett']['equal_variances']:
+                            st.success("✅ Equal variances")
+                        else:
+                            st.error("❌ Unequal variances")
+                
+                # Variance details
+                if 'group_variances' in results:
+                    st.write("**Group Variances**")
+                    var_df = pd.DataFrame([
+                        {'Group': k, 'Variance': v} 
+                        for k, v in results['group_variances'].items()
+                    ])
+                    st.dataframe(var_df, use_container_width=True)
+                    
+                    # Variance ratio
+                    if 'variance_ratio' in results:
+                        st.metric("Max/Min Variance Ratio", f"{results['variance_ratio']:.2f}")
+                        if results['variance_ratio'] > 3:
+                            st.warning("⚠️ Large variance differences between groups")
+                
+                # Interpretation
+                st.markdown("---")
+                st.info("💡 **Why test variance homogeneity?**")
+                st.write("- Required assumption for ANOVA")
+                st.write("- Indicates if groups have similar variability")
+                st.write("- Helps choose appropriate statistical tests")
