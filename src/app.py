@@ -25,10 +25,13 @@ from data.cleaner import DataCleaner
 from analysis.features import FeatureExtractor
 from analysis.timing import TimingAnalyzer
 from analysis.statistics import StatisticalAnalyzer
+from analysis.signal_quality import SignalQualityAnalyzer
+from analysis.statistical_tests import StatisticalTester
 from ml.clustering import ClusterAnalyzer
 from visualization.plots import PlotGenerator
 from visualization.signals import SignalVisualizer
 from visualization.ml_plots import MLVisualizer
+from visualization.eda_plots import EDAVisualizer
 from utils.helpers import safe_plot_close, format_metric
 from utils.report import ReportGenerator
 from ui.sidebar import create_sidebar
@@ -36,6 +39,11 @@ from ui.tabs import (
     create_overview_tab, create_outlier_tab, create_timing_tab,
     create_features_tab, create_ml_tab, create_signals_tab,
     create_report_tab, create_anomaly_tab
+)
+from ui.eda_tabs import (
+    create_signal_quality_tab,
+    create_advanced_visualization_tab,
+    create_statistical_testing_tab
 )
 
 warnings.filterwarnings('ignore')
@@ -94,6 +102,9 @@ def main():
     signal_visualizer = SignalVisualizer()
     ml_visualizer = MLVisualizer()
     report_generator = ReportGenerator()
+    signal_quality_analyzer = SignalQualityAnalyzer()
+    stats_tester = StatisticalTester()
+    eda_visualizer = EDAVisualizer()
     
     # Create sidebar
     uploaded_file = create_sidebar()
@@ -141,15 +152,27 @@ def main():
     # Tab 3: Timing Analysis
     with tabs[2]:
         create_timing_tab(df, timing_analyzer, plot_generator)
-    
-    # Tab 4: Feature Extraction
+
+    # Tab 4: Signal Quality
     with tabs[3]:
+        create_signal_quality_tab(df, signal_quality_analyzer, eda_visualizer, stats_tester)
+
+    # Tab 5: Advanced Visualizations
+    with tabs[4]:
+        create_advanced_visualization_tab(df, eda_visualizer, stats_tester)
+
+    # Tab 6: Statistical Testing
+    with tabs[5]:
+        create_statistical_testing_tab(df, stats_tester)
+    
+    # Tab 7: Feature Extraction
+    with tabs[6]:
         features_df = create_features_tab(df, feature_extractor, stats_analyzer, plot_generator)
         if features_df is not None and not features_df.empty:
             st.session_state.ml_results['features_df'] = features_df
     
-    # Tab 5: ML Analysis
-    with tabs[4]:
+    # Tab 8: ML Analysis
+    with tabs[7]:
         ml_results = create_ml_tab(
             st.session_state.ml_results['features_df'],
             cluster_analyzer,
@@ -158,12 +181,12 @@ def main():
         if ml_results:
             st.session_state.ml_results.update(ml_results)
     
-    # Tab 6: Signal Plots
-    with tabs[5]:
+    # Tab 9: Signal Plots
+    with tabs[8]:
         create_signals_tab(df, signal_visualizer)
     
-    # Tab 7: Summary Report
-    with tabs[6]:
+    # Tab 10: Summary Report
+    with tabs[9]:
         create_report_tab(
             df,
             st.session_state.outlier_mask,
@@ -174,8 +197,8 @@ def main():
             timing_analyzer
         )
     
-    # Tab 8: Anomaly Investigation
-    with tabs[7]:
+    # Tab 11: Anomaly Investigation
+    with tabs[10]:
         create_anomaly_tab(
             df,
             st.session_state.ml_results,

@@ -58,8 +58,11 @@ INITIAL_SIDEBAR_STATE = "expanded"
 # Tab names
 TABS = [
     "📊 Data Overview",
-    "🧹 Outlier Detection",
+    "🧹 Outlier Detection", 
     "⏱️ Timing Analysis",
+    "🎯 Signal Quality",  # NEW
+    "📈 Advanced Visualizations",  # NEW
+    "🔬 Statistical Testing",  # NEW
     "🔬 Feature Extraction",
     "🤖 ML Analysis",
     "📈 Signal Plots",
