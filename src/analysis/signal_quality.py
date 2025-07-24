@@ -1,3 +1,4 @@
+# src/analysis/signal_quality.py - Update imports and fix the method
 """
 Signal quality analysis module for IMU sensor data
 """
@@ -6,6 +7,7 @@ import numpy as np
 import pandas as pd
 from scipy import signal, stats
 from scipy.fft import fft, fftfreq
+from statsmodels.tsa.stattools import adfuller
 import streamlit as st
 from typing import Dict, Tuple, Optional
 from config import SAMPLING_RATE_HZ
@@ -151,8 +153,15 @@ class SignalQualityAnalyzer:
                     data = group[sensor].values
                     
                     if len(data) > 10:
-                        # Stationarity test
-                        adf_stat, adf_pvalue, _, _, _, _ = stats.adfuller(data, autolag='AIC')
+                        # Stationarity test using adfuller from statsmodels
+                        try:
+                            adf_result = adfuller(data, autolag='AIC')
+                            adf_stat = adf_result[0]
+                            adf_pvalue = adf_result[1]
+                        except Exception as e:
+                            # Fallback if ADF test fails
+                            adf_stat = 0
+                            adf_pvalue = 1.0
                         
                         # Coefficient of variation
                         cv = np.std(data) / np.mean(data) if np.mean(data) != 0 else 0
