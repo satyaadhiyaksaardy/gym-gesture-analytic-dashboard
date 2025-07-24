@@ -20,9 +20,12 @@ pandas>=1.5.0
 numpy>=1.24.0
 matplotlib>=3.6.0
 seaborn>=0.12.0
+plotly>=5.11.0
 scipy>=1.9.0
 scikit-learn>=1.2.0
-pywavelets>=1.4.0
+PyWavelets>=1.4.0
+statsmodels>=0.13.5
+librosa>=0.9.2
 ```
 
 ## 🛠️ Installation
@@ -50,7 +53,7 @@ pip install -r requirements.txt
 streamlit run src/app.py
 ```
 
-The application will open in your default web browser at `http://localhost:8501`.
+The application will open in your default web browser.
 
 ## 📊 Data Format
 
@@ -66,9 +69,7 @@ The application expects CSV files with the following columns:
 - `weight_kg`: Weight used in the exercise
 - `set_number`: Set number within the workout
 - `rep_number`: Repetition number within the set
-
-### Optional Columns:
-- `timestamp`: Timestamp for each sensor reading (recommended for timing analysis)
+- `timestamp`: Timestamp for each sensor reading
 
 ### Expected Format:
 - Sampling rate: 100 Hz (10ms intervals)
@@ -107,16 +108,52 @@ gym-sensor-analysis/
 │       ├── __init__.py
 │       ├── sidebar.py        # Sidebar components
 │       └── tabs.py           # Tab components
-├── tests/
-│   ├── test_data_loader.py
-│   ├── test_features.py
-│   └── test_clustering.py
 ├── examples/
 │   └── sample_data.csv       # Example data file
 ├── requirements.txt
 ├── README.md
 └── .gitignore
 ```
+
+## Enhanced EDA Features
+
+### Signal Quality Analysis
+- **Signal-to-Noise Ratio (SNR)** calculation for all sensor channels
+- **Sensor drift detection** using linear regression analysis
+- **Noise characterization** including RMS, crest factor, and distribution analysis
+- **Signal stability testing** with ADF stationarity tests
+
+### Advanced Visualizations
+- **Interactive 3D trajectories** for accelerometer and gyroscope data
+- **Comprehensive spectrograms** with time series, spectrogram, and PSD views
+- **Autocorrelation analysis** to identify periodic patterns
+- **Cross-sensor correlation matrices** with statistical significance
+- **Movement pattern analysis** showing intensity variations over time
+
+### Statistical Testing Suite
+- **Stationarity tests**: Augmented Dickey-Fuller and KPSS tests
+- **Normality tests**: Shapiro-Wilk, D'Agostino-Pearson, Anderson-Darling
+- **Exercise comparison**: ANOVA and Kruskal-Wallis with post-hoc analysis
+- **Sensor independence**: Correlation and mutual information tests
+
+## 📊 Key Metrics for Embedded Deployment
+
+When analyzing data for embedded deployment on Arduino Nano 33 BLE, pay attention to:
+
+1. **Signal Quality Metrics**
+   - SNR > 20 dB indicates good signal quality
+   - Minimal sensor drift (< 0.01 units/second)
+   - Low noise RMS values
+
+2. **Computational Complexity**
+   - Features with low computational cost (time-domain)
+   - Sampling rate optimization based on signal characteristics
+   - Memory-efficient feature selection
+
+3. **Statistical Properties**
+   - Stationarity for consistent model performance
+   - Exercise separability through statistical tests
+   - Optimal window sizes from autocorrelation analysis
 
 ## 🎯 Usage Guide
 
